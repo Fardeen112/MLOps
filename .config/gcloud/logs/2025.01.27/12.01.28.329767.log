@@ -1,0 +1,8 @@
+2025-01-27 12:01:28,336 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2025-01-27 12:01:28,354 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'get_value']
+2025-01-27 12:01:28,357 DEBUG    root            Running [gcloud.config.get-value] with arguments: [SECTION/PROPERTY: "project"]
+2025-01-27 12:01:28,401 DEBUG    root            Chosen display Format:value(.)
+2025-01-27 12:01:28,402 INFO     root            Display format: "value(.)"
+2025-01-27 12:01:28,402 INFO     ___FILE_ONLY___ involuted-tuner-441406-a9
+
+2025-01-27 12:01:28,403 DEBUG    root            SDK update checks are disabled.

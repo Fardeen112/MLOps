@@ -1,0 +1,3 @@
+2025-01-21 12:15:26,248 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2025-01-21 12:15:26,285 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'config_helper']
+2025-01-21 12:15:26,288 DEBUG    root            Running [gcloud.config.config-helper] with arguments: [--format: "json", --min-expiry: "1800"]

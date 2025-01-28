@@ -1,0 +1,98 @@
+2025-01-28 12:45:15,413 DEBUG    root            Loaded Command Group: ['gcloud', 'projects']
+2025-01-28 12:45:15,420 DEBUG    root            Loaded Command Group: ['gcloud', 'projects', 'describe']
+2025-01-28 12:45:15,422 DEBUG    root            Running [gcloud.projects.describe] with arguments: [--format: "value(projectNumber)", PROJECT_ID_OR_NUMBER: "involuted-tuner-441406-a9"]
+2025-01-28 12:45:15,458 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudresourcemanager.googleapis.com:443
+2025-01-28 12:45:15,515 DEBUG    urllib3.connectionpool https://cloudresourcemanager.googleapis.com:443 "GET /v1/projects/involuted-tuner-441406-a9?alt=json HTTP/1.1" 403 None
+2025-01-28 12:45:15,520 DEBUG    root            Chosen display Format:value(message.list(separator="
+"))
+2025-01-28 12:45:15,536 DEBUG    root            Chosen display Format:value(links.flatten(show="values",separator="
+"))
+2025-01-28 12:45:15,537 DEBUG    root            Chosen display Format:default
+2025-01-28 12:45:15,541 DEBUG    root            Chosen display Format:value(message.list(separator="
+"))
+2025-01-28 12:45:15,541 DEBUG    root            Chosen display Format:value(links.flatten(show="values",separator="
+"))
+2025-01-28 12:45:15,542 DEBUG    root            Chosen display Format:default
+2025-01-28 12:45:15,544 DEBUG    root            Chosen display Format:value(message.list(separator="
+"))
+2025-01-28 12:45:15,544 DEBUG    root            Chosen display Format:value(links.flatten(show="values",separator="
+"))
+2025-01-28 12:45:15,545 DEBUG    root            Chosen display Format:default
+2025-01-28 12:45:15,548 DEBUG    root            Chosen display Format:value(message.list(separator="
+"))
+2025-01-28 12:45:15,549 DEBUG    root            Chosen display Format:value(links.flatten(show="values",separator="
+"))
+2025-01-28 12:45:15,549 DEBUG    root            Chosen display Format:default
+2025-01-28 12:45:15,546 DEBUG    root            (gcloud.projects.describe) [260483181843-compute@developer.gserviceaccount.com] does not have permission to access projects instance [involuted-tuner-441406-a9] (or it may not exist): Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. This command is authenticated as 260483181843-compute@developer.gserviceaccount.com which is the active account specified by the [core/account] property.
+Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+Google developers console API activation
+https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+- '@type': type.googleapis.com/google.rpc.ErrorInfo
+  domain: googleapis.com
+  metadata:
+    activationUrl: https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+    consumer: projects/260483181843
+    containerInfo: '260483181843'
+    service: cloudresourcemanager.googleapis.com
+    serviceTitle: Cloud Resource Manager API
+  reason: SERVICE_DISABLED
+Traceback (most recent call last):
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 998, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 843, in Run
+    resources = command_instance.Run(args)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/surface/projects/describe.py", line 51, in Run
+    return projects_api.Get(project_ref)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/cloudresourcemanager/projects_api.py", line 129, in Get
+    return client.projects.Get(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/generated_clients/apis/cloudresourcemanager/v1/cloudresourcemanager_v1_client.py", line 758, in Get
+    return self._RunMethod(
+           ^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/third_party/apitools/base/py/base_api.py", line 744, in _RunMethod
+    http_response = http_wrapper.MakeRequest(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/third_party/apitools/base/py/http_wrapper.py", line 359, in MakeRequest
+    retry_func(ExceptionRetryArgs(http, http_request, e, retry,
+  File "/usr/bin/../lib/google-cloud-sdk/lib/third_party/apitools/base/py/http_wrapper.py", line 304, in HandleExceptionsAndRebuildHttpConnections
+    raise retry_args.exc
+  File "/usr/bin/../lib/google-cloud-sdk/lib/third_party/apitools/base/py/http_wrapper.py", line 348, in MakeRequest
+    return _MakeRequestNoRetry(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/third_party/apitools/base/py/http_wrapper.py", line 406, in _MakeRequestNoRetry
+    check_response_func(response)
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/apis.py", line 231, in _CheckResponse
+    _CheckForApiEnablementError(response_as_error)
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/apis.py", line 197, in _CheckForApiEnablementError
+    PromptToEnableApi(*enablement_info)
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/apis.py", line 180, in PromptToEnableApi
+    raise exception
+googlecloudsdk.api_lib.util.exceptions.HttpException: [260483181843-compute@developer.gserviceaccount.com] does not have permission to access projects instance [involuted-tuner-441406-a9] (or it may not exist): Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. This command is authenticated as 260483181843-compute@developer.gserviceaccount.com which is the active account specified by the [core/account] property.
+Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+Google developers console API activation
+https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+- '@type': type.googleapis.com/google.rpc.ErrorInfo
+  domain: googleapis.com
+  metadata:
+    activationUrl: https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+    consumer: projects/260483181843
+    containerInfo: '260483181843'
+    service: cloudresourcemanager.googleapis.com
+    serviceTitle: Cloud Resource Manager API
+  reason: SERVICE_DISABLED
+2025-01-28 12:45:15,551 ERROR    root            (gcloud.projects.describe) [260483181843-compute@developer.gserviceaccount.com] does not have permission to access projects instance [involuted-tuner-441406-a9] (or it may not exist): Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. This command is authenticated as 260483181843-compute@developer.gserviceaccount.com which is the active account specified by the [core/account] property.
+Cloud Resource Manager API has not been used in project 260483181843 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+Google developers console API activation
+https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+- '@type': type.googleapis.com/google.rpc.ErrorInfo
+  domain: googleapis.com
+  metadata:
+    activationUrl: https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=260483181843
+    consumer: projects/260483181843
+    containerInfo: '260483181843'
+    service: cloudresourcemanager.googleapis.com
+    serviceTitle: Cloud Resource Manager API
+  reason: SERVICE_DISABLED

@@ -1,0 +1,433 @@
+{
+  "components": {
+    "comp-deploy-model": {
+      "executorLabel": "exec-deploy-model",
+      "inputDefinitions": {
+        "parameters": {
+          "endpoint_display_name": {
+            "parameterType": "STRING"
+          },
+          "gcs_model_uri": {
+            "parameterType": "STRING"
+          },
+          "location": {
+            "parameterType": "STRING"
+          },
+          "model_display_name": {
+            "parameterType": "STRING"
+          },
+          "project": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-evaluate-model": {
+      "executorLabel": "exec-evaluate-model",
+      "inputDefinitions": {
+        "parameters": {
+          "model_path": {
+            "parameterType": "STRING"
+          },
+          "x_test_path": {
+            "parameterType": "STRING"
+          },
+          "y_test_path": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "parameters": {
+          "accuracy": {
+            "parameterType": "NUMBER_DOUBLE"
+          },
+          "f1": {
+            "parameterType": "NUMBER_DOUBLE"
+          },
+          "precision": {
+            "parameterType": "NUMBER_DOUBLE"
+          },
+          "recall": {
+            "parameterType": "NUMBER_DOUBLE"
+          }
+        }
+      }
+    },
+    "comp-load-data": {
+      "executorLabel": "exec-load-data",
+      "inputDefinitions": {
+        "parameters": {
+          "gcs_path": {
+            "parameterType": "STRING"
+          },
+          "test_size": {
+            "defaultValue": 0.3,
+            "isOptional": true,
+            "parameterType": "NUMBER_DOUBLE"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "parameters": {
+          "x_test_path": {
+            "parameterType": "STRING"
+          },
+          "x_train_path": {
+            "parameterType": "STRING"
+          },
+          "y_test_path": {
+            "parameterType": "STRING"
+          },
+          "y_train_path": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-train-model": {
+      "executorLabel": "exec-train-model",
+      "inputDefinitions": {
+        "parameters": {
+          "C": {
+            "defaultValue": 0.5,
+            "isOptional": true,
+            "parameterType": "NUMBER_DOUBLE"
+          },
+          "max_iter": {
+            "defaultValue": 500.0,
+            "isOptional": true,
+            "parameterType": "NUMBER_INTEGER"
+          },
+          "x_train_path": {
+            "parameterType": "STRING"
+          },
+          "y_train_path": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "parameters": {
+          "Output": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-upload-model": {
+      "executorLabel": "exec-upload-model",
+      "inputDefinitions": {
+        "parameters": {
+          "bucket_name": {
+            "parameterType": "STRING"
+          },
+          "gcs_model_path": {
+            "parameterType": "STRING"
+          },
+          "model_path": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "parameters": {
+          "Output": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    }
+  },
+  "deploymentSpec": {
+    "executors": {
+      "exec-deploy-model": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "deploy_model"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef deploy_model(\n    project: str,\n    location: str,\n    model_display_name: str,\n    gcs_model_uri: str,\n    endpoint_display_name: str\n):\n    from google.cloud import aiplatform\n\n    # Initialize Vertex AI\n    aiplatform.init(project=project, location=location)\n\n    # Upload and deploy model\n    model = aiplatform.Model.upload(\n        display_name=model_display_name,\n        artifact_uri=gcs_model_uri,\n        serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-5:latest\"\n    )\n\n    endpoint = model.deploy(\n        deployed_model_display_name=endpoint_display_name,\n        machine_type=\"n1-standard-2\"\n    )\n\n"
+          ],
+          "image": "python:3.9"
+        }
+      },
+      "exec-evaluate-model": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "evaluate_model"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'scikit-learn' 'joblib' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef evaluate_model(\n    model_path: str,\n    x_test_path: str,\n    y_test_path: str\n) -> NamedTuple('Outputs', [\n    ('accuracy', float),\n    ('precision', float),\n    ('recall', float),\n    ('f1', float)\n]):\n    import joblib\n    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score\n\n    # Load model and test data\n    model = joblib.load(model_path)\n    X_test = joblib.load(x_test_path)\n    y_test = joblib.load(y_test_path)\n\n    # Make predictions\n    y_pred = model.predict(X_test)\n\n    # Calculate metrics\n    accuracy = accuracy_score(y_test, y_pred)\n    precision = precision_score(y_test, y_pred, average='weighted')\n    recall = recall_score(y_test, y_pred, average='weighted')\n    f1 = f1_score(y_test, y_pred, average='weighted')\n\n    return (accuracy, precision, recall, f1)\n\n"
+          ],
+          "image": "python:3.9"
+        }
+      },
+      "exec-load-data": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "load_data"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn' 'google-cloud-storage' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef load_data(\n    gcs_path: str,\n    test_size: float = 0.3\n) -> NamedTuple('Outputs', [\n    ('x_train_path', str),\n    ('x_test_path', str),\n    ('y_train_path', str),\n    ('y_test_path', str)\n]):\n    import pandas as pd\n    from sklearn.model_selection import train_test_split\n    import joblib\n\n    # Load data\n    data = pd.read_csv(gcs_path)\n    X = data.drop(columns=[\"Diabetic\", \"PatientID\"])\n    y = data[\"Diabetic\"]\n\n    # Split data\n    X_train, X_test, y_train, y_test = train_test_split(\n        X, y, test_size=test_size, random_state=42\n    )\n\n    # Save splits to local files\n\n"
+          ],
+          "image": "python:3.9"
+        }
+      },
+      "exec-train-model": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "train_model"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'scikit-learn' 'joblib' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef train_model(\n    x_train_path: str,\n    y_train_path: str,\n    max_iter: int = 500,\n    C: float = 0.5\n) -> str:\n    import joblib\n    from sklearn.linear_model import LogisticRegression\n\n    # Load training data\n    X_train = joblib.load(x_train_path)\n    y_train = joblib.load(y_train_path)\n\n    # Train model\n    model = LogisticRegression(solver='saga', max_iter=max_iter, C=C)\n    model.fit(X_train, y_train)\n\n    # Save model\n    model_path = '/tmp/model.joblib'\n    joblib.dump(model, model_path)\n\n    return model_path\n\n"
+          ],
+          "image": "python:3.9"
+        }
+      },
+      "exec-upload-model": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "upload_model"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-storage' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef upload_model(\n    model_path: str,\n    bucket_name: str,\n    gcs_model_path: str\n) -> str:\n    from google.cloud import storage\n\n    # Upload model to GCS\n    storage_client = storage.Client()\n    bucket = storage_client.bucket(bucket_name)\n    blob = bucket.blob(gcs_model_path)\n    blob.upload_from_filename(model_path)\n\n    gcs_uri = f\"gs://{bucket_name}/{gcs_model_path}\"\n    return gcs_uri\n\n"
+          ],
+          "image": "python:3.9"
+        }
+      }
+    }
+  },
+  "pipelineInfo": {
+    "description": "Pipeline for training and deploying diabetes prediction model",
+    "name": "diabetes-prediction-pipeline"
+  },
+  "root": {
+    "dag": {
+      "tasks": {
+        "deploy-model": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-deploy-model"
+          },
+          "dependentTasks": [
+            "upload-model"
+          ],
+          "inputs": {
+            "parameters": {
+              "endpoint_display_name": {
+                "componentInputParameter": "endpoint_display_name"
+              },
+              "gcs_model_uri": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "Output",
+                  "producerTask": "upload-model"
+                }
+              },
+              "location": {
+                "componentInputParameter": "location"
+              },
+              "model_display_name": {
+                "componentInputParameter": "model_display_name"
+              },
+              "project": {
+                "componentInputParameter": "project_id"
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "deploy-model"
+          }
+        },
+        "evaluate-model": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-evaluate-model"
+          },
+          "dependentTasks": [
+            "load-data",
+            "train-model"
+          ],
+          "inputs": {
+            "parameters": {
+              "model_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "Output",
+                  "producerTask": "train-model"
+                }
+              },
+              "x_test_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "x_test_path",
+                  "producerTask": "load-data"
+                }
+              },
+              "y_test_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "y_test_path",
+                  "producerTask": "load-data"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "evaluate-model"
+          }
+        },
+        "load-data": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-load-data"
+          },
+          "inputs": {
+            "parameters": {
+              "gcs_path": {
+                "componentInputParameter": "gcs_data_path"
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "load-data"
+          }
+        },
+        "train-model": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-train-model"
+          },
+          "dependentTasks": [
+            "load-data"
+          ],
+          "inputs": {
+            "parameters": {
+              "x_train_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "x_train_path",
+                  "producerTask": "load-data"
+                }
+              },
+              "y_train_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "y_train_path",
+                  "producerTask": "load-data"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "train-model"
+          }
+        },
+        "upload-model": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-upload-model"
+          },
+          "dependentTasks": [
+            "train-model"
+          ],
+          "inputs": {
+            "parameters": {
+              "bucket_name": {
+                "componentInputParameter": "bucket_name"
+              },
+              "gcs_model_path": {
+                "runtimeValue": {
+                  "constant": "models/model.joblib"
+                }
+              },
+              "model_path": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "Output",
+                  "producerTask": "train-model"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "upload-model"
+          }
+        }
+      }
+    },
+    "inputDefinitions": {
+      "parameters": {
+        "bucket_name": {
+          "parameterType": "STRING"
+        },
+        "endpoint_display_name": {
+          "parameterType": "STRING"
+        },
+        "gcs_data_path": {
+          "parameterType": "STRING"
+        },
+        "location": {
+          "parameterType": "STRING"
+        },
+        "model_display_name": {
+          "parameterType": "STRING"
+        },
+        "project_id": {
+          "parameterType": "STRING"
+        }
+      }
+    }
+  },
+  "schemaVersion": "2.1.0",
+  "sdkVersion": "kfp-2.10.1"
+}

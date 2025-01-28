@@ -1,0 +1,391 @@
+# PIPELINE DEFINITION
+# Name: metadata-pipeline-v2
+# Inputs:
+#    message: str
+components:
+  comp-deploy-model:
+    executorLabel: exec-deploy-model
+    inputDefinitions:
+      parameters:
+        bucket_name:
+          defaultValue: mlops-01-pipeline
+          description: GCS bucket name where model is stored
+          isOptional: true
+          parameterType: STRING
+        description:
+          defaultValue: metrics path
+          isOptional: true
+          parameterType: STRING
+        location:
+          defaultValue: us-central1
+          description: GCP region
+          isOptional: true
+          parameterType: STRING
+        model_filename:
+          defaultValue: model.joblib
+          description: Name of the model file in GCS
+          isOptional: true
+          parameterType: STRING
+        project:
+          defaultValue: your-project-id
+          description: GCP project ID
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        endpoint_name:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+  comp-importer:
+    executorLabel: exec-importer
+    inputDefinitions:
+      parameters:
+        uri:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        artifact:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-test:
+    executorLabel: exec-test
+    inputDefinitions:
+      artifacts:
+        imported_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      parameters:
+        metrics_gcs_path:
+          parameterType: STRING
+  comp-train:
+    executorLabel: exec-train
+    inputDefinitions:
+      artifacts:
+        imported_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      parameters:
+        model_accuracy:
+          parameterType: NUMBER_DOUBLE
+        output_message:
+          parameterType: STRING
+defaultPipelineRoot: gs://mlops-01-pipeline/pipeline_root_1/pipeline_root/shakespeare
+deploymentSpec:
+  executors:
+    exec-deploy-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - deploy_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef deploy_model(\n    project: str = \"your-project-id\",  # Replace\
+          \ with your project ID\n    location: str = \"us-central1\",     # Replace\
+          \ with your desired location\n    description: str= \"metrics path\",\n\
+          \    bucket_name: str = \"mlops-01-pipeline\",\n    model_filename: str\
+          \ = \"model.joblib\",\n) -> NamedTuple(\n    \"Outputs\",\n    [\n     \
+          \   (\"endpoint_name\", str),\n        (\"model_name\", str),\n    ],\n\
+          ):\n    \"\"\"\n    Uploads a trained model to Vertex AI and deploys it\
+          \ to an endpoint.\n\n    Args:\n        project: GCP project ID\n      \
+          \  location: GCP region\n        bucket_name: GCS bucket name where model\
+          \ is stored\n        model_filename: Name of the model file in GCS\n\n \
+          \   Returns:\n        NamedTuple containing endpoint and model names\n \
+          \   \"\"\"\n    import logging\n    from google.cloud import aiplatform\n\
+          \n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\
+          \n    try:\n        # Initialize Vertex AI\n        aiplatform.init(\n \
+          \           project=project,\n            location=location,\n        )\n\
+          \n        # Construct GCS URI for the model\n        gcs_model_uri = f\"\
+          gs://{bucket_name}/models\"\n        logger.info(f\"Model URI: {gcs_model_uri}\"\
+          )\n\n        # Generate unique names for model and endpoint\n        import\
+          \ datetime\n        timestamp = datetime.datetime.now().strftime(\"%Y%m%d_%H%M%S\"\
+          )\n        model_display_name = f\"diabetes_prediction_{timestamp}\"\n \
+          \       endpoint_display_name = f\"diabetes_endpoint_{timestamp}\"\n\n \
+          \       logger.info(f\"Uploading model: {model_display_name}\")\n      \
+          \  # Upload model to Vertex AI\n        model = aiplatform.Model.upload(\n\
+          \            display_name=model_display_name,\n            artifact_uri=gcs_model_uri,\n\
+          \            serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-5:latest\"\
+          ,\n            description=description\n        )\n        logger.info(f\"\
+          Model uploaded successfully: {model.resource_name}\")\n\n        logger.info(f\"\
+          Deploying model to endpoint: {endpoint_display_name}\")\n        # Deploy\
+          \ model to endpoint\n        endpoint = model.deploy(\n            deployed_model_display_name=endpoint_display_name,\n\
+          \            machine_type=\"n1-standard-2\",\n        )\n        logger.info(f\"\
+          Model deployed successfully to endpoint: {endpoint.resource_name}\")\n\n\
+          \        return (endpoint.resource_name, model.resource_name)\n\n    except\
+          \ Exception as e:\n        logger.error(f\"An error occurred during model\
+          \ deployment: {str(e)}\")\n        raise RuntimeError(f\"Model deployment\
+          \ failed: {str(e)}\")\n\n"
+        image: python:3.9
+    exec-importer:
+      importer:
+        artifactUri:
+          constant: gs://mlops-01-pipeline/Dataset_diabetes-dev.csv
+        typeSchema:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+    exec-test:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - test
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'pandas' 'numpy' 'google-cloud-storage' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef test(\n    imported_dataset: Input[Dataset],\n) -> NamedTuple(\n\
+          \    \"Outputs\",\n    [\n        (\"metrics_gcs_path\", str),\n    ],\n\
+          ):\n    \"\"\"Test step for evaluating the trained model.\n    Uses the\
+          \ same test split as training by loading saved test indices.\n    \"\"\"\
+          \n    import logging\n    import os\n    import json\n    from google.cloud\
+          \ import storage\n    import tempfile\n    from datetime import datetime\n\
+          \n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\
+          \n    try:\n        import pandas as pd\n        import joblib\n       \
+          \ from sklearn.metrics import accuracy_score, precision_score, recall_score,\
+          \ f1_score\n\n        logger.info(\"Successfully imported all required packages\"\
+          )\n\n        # Constants\n        bucket_name = \"mlops-01-pipeline\"\n\
+          \        model_folder = \"models\"\n        model_filename = \"model.joblib\"\
+          \n        metrics_folder=\"metrics\"\n        indices_filename = \"test_indices.json\"\
+          \n\n        gcs_model_path = f\"{model_folder}/{model_filename}\"\n    \
+          \    gcs_indices_path = f\"{model_folder}/{indices_filename}\"\n\n     \
+          \   # Load full dataset\n        logger.info(f\"Loading dataset from: {imported_dataset.path}\"\
+          )\n        df = pd.read_csv(imported_dataset.path)\n\n        # Initialize\
+          \ GCS client\n        storage_client = storage.Client()\n        bucket\
+          \ = storage_client.bucket(bucket_name)\n\n        # Create a temporary directory\n\
+          \        with tempfile.TemporaryDirectory() as temp_dir:\n            #\
+          \ Download model and test indices from GCS\n            temp_model_path\
+          \ = os.path.join(temp_dir, model_filename)\n            temp_indices_path\
+          \ = os.path.join(temp_dir, indices_filename)\n\n            # Download model\n\
+          \            model_blob = bucket.blob(gcs_model_path)\n            logger.info(f\"\
+          Downloading model from GCS: gs://{bucket_name}/{gcs_model_path}\")\n   \
+          \         model_blob.download_to_filename(temp_model_path)\n\n         \
+          \   # Download test indices\n            indices_blob = bucket.blob(gcs_indices_path)\n\
+          \            logger.info(f\"Downloading test indices from GCS: gs://{bucket_name}/{gcs_indices_path}\"\
+          )\n            indices_blob.download_to_filename(temp_indices_path)\n\n\
+          \            # Load model and test indices\n            model = joblib.load(temp_model_path)\n\
+          \            with open(temp_indices_path, 'r') as f:\n                test_indices\
+          \ = json.load(f)['test_indices']\n\n            # Prepare test features\
+          \ and target using saved indices\n            test_df = df.iloc[test_indices]\n\
+          \            X_test = test_df.drop(columns=[\"Diabetic\", \"PatientID\"\
+          ])\n            y_test = test_df[\"Diabetic\"]\n\n            logger.info(f\"\
+          Test set size: {len(test_indices)}\")\n\n            # Make predictions\n\
+          \            logger.info(\"Making predictions on test data\")\n        \
+          \    y_pred = model.predict(X_test)\n\n            # Calculate metrics\n\
+          \            metrics = {\n                \"accuracy\": str(accuracy_score(y_test,\
+          \ y_pred)),\n                \"precision\": str(precision_score(y_test,\
+          \ y_pred)),\n                \"recall\": str(recall_score(y_test, y_pred)),\n\
+          \                \"f1_score\": str(f1_score(y_test, y_pred)),\n        \
+          \        \"timestamp\": str(datetime.now().strftime(\"%Y-%m-%d_%H-%M-%S\"\
+          ))\n            }\n\n            logger.info(f\"Evaluation metrics: {metrics}\"\
+          )\n            timestamp = datetime.now().strftime(\"%Y%m%d_%H%M%S\")\n\n\
+          \            # Create metrics filename using same base name as model\n \
+          \           # metrics_filename = model_filename.replace('.joblib', f'_metrics_{timestamp}.json')\n\
+          \n            # Define the path where you want to store the metrics (e.g.,\
+          \ in the 'metrics' folder)\n            # metrics_folder = \"metrics\"\n\
+          \            # os.makedirs(metrics_folder, exist_ok=True)  # Create the\
+          \ 'metrics' folder if it doesn't exist\n\n            # GCS Path where you\
+          \ will store the metrics\n            # metrics_gcs_path = f\"{metrics_folder}/{metrics_filename}\"\
+          \n\n            metrics_filename = model_filename.replace('.joblib', f'{timestamp}_metrics.json')\n\
+          \            metrics_gcs_path = f\"{metrics_folder}/{metrics_filename}\"\
+          \n\n            # Save metrics to temporary JSON file\n            temp_metrics_path\
+          \ = os.path.join(temp_dir, metrics_filename)\n            with open(temp_metrics_path,\
+          \ 'w') as f:\n                json.dump(metrics, f, indent=4)\n\n      \
+          \      # Upload metrics to GCS\n            metrics_blob = bucket.blob(metrics_gcs_path)\n\
+          \            logger.info(f\"Uploading metrics to GCS: gs://{bucket_name}/{metrics_gcs_path}\"\
+          )\n            metrics_blob.upload_from_filename(temp_metrics_path)\n  \
+          \          logger.info(\"Metrics successfully uploaded to GCS\")\n\n   \
+          \     return (f\"gs://{bucket_name}/{metrics_gcs_path}\",)\n\n    except\
+          \ Exception as e:\n        logger.error(f\"An error occurred: {str(e)}\"\
+          )\n        raise RuntimeError(f\"Testing failed: {str(e)}\")\n\n"
+        image: python:3.9
+    exec-train:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'pandas' 'numpy' 'google-cloud-storage' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train(\n    imported_dataset: Input[Dataset],\n    # df: pandas.DataFrame\n\
+          ) -> NamedTuple(\n    \"Outputs\",\n    [\n        (\"output_message\",\
+          \ str),\n        (\"model_accuracy\", float),\n    ],\n):\n    \"\"\"Training\
+          \ step using scikit-learn logistic regression.\n    Loads data from the\
+          \ imported dataset, trains a logistic regression model,\n    saves it to\
+          \ GCS in the models folder, and returns the accuracy metrics.\n    \"\"\"\
+          \n    import logging\n    import os\n    from google.cloud import storage\n\
+          \    import tempfile\n\n    logging.basicConfig(level=logging.INFO)\n  \
+          \  logger = logging.getLogger(__name__)\n\n    try:\n        import pandas\
+          \ as pd\n        import joblib\n        from sklearn.linear_model import\
+          \ LogisticRegression\n        from sklearn.model_selection import train_test_split\n\
+          \        from sklearn.metrics import accuracy_score\n\n        logger.info(\"\
+          Successfully imported all required packages\")\n\n        # Load dataset\n\
+          \        logger.info(f\"Loading dataset from: {imported_dataset.path}\"\
+          )\n        df = pd.read_csv(imported_dataset.path)\n        logger.info(f\"\
+          Dataset shape: {df.shape}\")\n\n        # Split features and target\n  \
+          \      X = df.drop(columns=[\"Diabetic\", \"PatientID\"])\n        y = df[\"\
+          Diabetic\"]\n        logger.info(f\"Features shape: {X.shape}, Target shape:\
+          \ {y.shape}\")\n\n        # Split the data\n        X_train, X_test, y_train,\
+          \ y_test = train_test_split(\n            X, y, test_size=0.2, random_state=42\n\
+          \        )\n        logger.info(f\"Training set size: {X_train.shape[0]},\
+          \ Test set size: {X_test.shape[0]}\")\n\n        # Train logistic regression\
+          \ model\n        lr_model = LogisticRegression(max_iter=1000)\n        logger.info(\"\
+          Training logistic regression model...\")\n        lr_model.fit(X_train,\
+          \ y_train)\n\n        # Make predictions and calculate accuracy\n      \
+          \  y_pred = lr_model.predict(X_test)\n        accuracy = accuracy_score(y_test,\
+          \ y_pred)\n        logger.info(f\"Model training completed. Accuracy: {accuracy:.4f}\"\
+          )\n\n        # Save model to GCS\n        bucket_name = \"mlops-01-pipeline\"\
+          \n        model_folder = \"models\"  # Folder in the bucket\n        model_filename\
+          \ = \"model.joblib\"\n        gcs_model_path = f\"{model_folder}/{model_filename}\"\
+          \  # Path within bucket\n\n        # Create a temporary directory\n    \
+          \    with tempfile.TemporaryDirectory() as temp_dir:\n            temp_model_path\
+          \ = os.path.join(temp_dir, model_filename)\n\n            # Save model to\
+          \ temporary file\n            logger.info(f\"Saving model to temporary file:\
+          \ {temp_model_path}\")\n            joblib.dump(lr_model, temp_model_path)\n\
+          \n            # Initialize GCS client\n            storage_client = storage.Client()\n\
+          \            bucket = storage_client.bucket(bucket_name)\n\n           \
+          \ # Upload to GCS in models folder\n            blob = bucket.blob(gcs_model_path)\n\
+          \            logger.info(f\"Uploading model to GCS: gs://{bucket_name}/{gcs_model_path}\"\
+          )\n            blob.upload_from_filename(temp_model_path)\n            logger.info(\"\
+          Model successfully uploaded to GCS\")\n\n        # Create output message\n\
+          \        output_message = (\n            f\"Model trained successfully with\
+          \ accuracy: {accuracy:.4f}. \"\n            f\"Model saved to: gs://{bucket_name}/{gcs_model_path}\"\
+          \n        )\n\n        return (output_message, float(accuracy))\n\n    except\
+          \ Exception as e:\n        logger.error(f\"An error occurred: {str(e)}\"\
+          )\n        raise RuntimeError(f\"Training failed: {str(e)}\")\n\n"
+        image: python:3.9
+pipelineInfo:
+  name: metadata-pipeline-v2
+root:
+  dag:
+    tasks:
+      deploy-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-deploy-model
+        dependentTasks:
+        - test
+        inputs:
+          parameters:
+            description:
+              taskOutputParameter:
+                outputParameterKey: metrics_gcs_path
+                producerTask: test
+            location:
+              runtimeValue:
+                constant: us-central1
+            project:
+              runtimeValue:
+                constant: involuted-tuner-441406-a9
+        taskInfo:
+          name: deploy-model
+      importer:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-importer
+        inputs:
+          parameters:
+            uri:
+              runtimeValue:
+                constant: gs://mlops-01-pipeline/Dataset_diabetes-dev.csv
+        taskInfo:
+          name: importer
+      test:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-test
+        dependentTasks:
+        - importer
+        - train
+        inputs:
+          artifacts:
+            imported_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: artifact
+                producerTask: importer
+        taskInfo:
+          name: test
+      train:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train
+        dependentTasks:
+        - importer
+        inputs:
+          artifacts:
+            imported_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: artifact
+                producerTask: importer
+        taskInfo:
+          name: train
+  inputDefinitions:
+    parameters:
+      message:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0
